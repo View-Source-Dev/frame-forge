@@ -44,7 +44,10 @@ export async function POST(request: Request): Promise<Response> {
 		totalPasses: TOTAL_PASSES,
 	});
 
-	startJob(job.id);
+	// Real jobs are picked up by the standalone worker (worker/worker.mjs), which
+	// polls for `queued` jobs. Set FORGE_USE_STUB=1 to instead run the in-process
+	// simulated worker (demo without an API key / without the worker running).
+	if (process.env.FORGE_USE_STUB === "1") startJob(job.id);
 	return Response.json(job, { status: 201 });
 }
 

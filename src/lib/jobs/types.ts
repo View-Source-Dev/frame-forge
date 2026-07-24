@@ -32,11 +32,16 @@ export interface ReviewPass {
 }
 
 export interface JobResult {
-	// Key into the procedural model registry. Stands in for the skill's real
-	// output artifact (`createObjectModel.ts`) — see src/lib/models/registry.ts.
-	modelKey: string;
+	// Legacy stub path: a key into the procedural model registry. `null` for real
+	// worker jobs, which deliver a rendered GLB artifact instead.
+	modelKey: string | null;
+	// True when the worker rendered a GLB artifact to disk (data/jobs/<id>/model.glb),
+	// served at /api/jobs/<id>/model and loaded directly by the viewer.
+	glb: boolean;
 	outcome: JobOutcome;
 	finalFidelity: number;
+	// What the reconstruction actually cost (real worker only).
+	costUsd?: number;
 }
 
 export interface Job {

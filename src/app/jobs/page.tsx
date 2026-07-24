@@ -66,7 +66,8 @@ export default async function JobsPage() {
 									</p>
 									<p className="mt-0.5 text-xs text-[#858c98]">
 										{when(job.createdAt)}
-										{job.result && ` · ${modelLabel(job.result.modelKey)}`}
+										{job.result?.modelKey &&
+											` · ${modelLabel(job.result.modelKey)}`}
 									</p>
 								</div>
 								<StatusBadge status={job.status} />
