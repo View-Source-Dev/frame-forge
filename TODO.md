@@ -16,17 +16,21 @@ The whole architecture follows from that one fact.
 
 Beyond the reconstruction pipeline itself, the product must ship these:
 
-- [ ] **Export the result as `.glb` / `.gltf`.** The skill produces a *procedural* Three.js
+- [x] **Export the result as `.glb` / `.gltf`.** The skill produces a *procedural* Three.js
       model (code that builds a `THREE.Group` at runtime), so export by running Three.js
       `GLTFExporter` on the instantiated group in the viewer:
-  - [ ] "Download GLB" (single binary file) and "Download glTF" (JSON + assets) buttons.
-  - [ ] Bake procedural / canvas-generated textures into the export so materials survive the round-trip.
-  - [ ] Flag anything that can't export cleanly (custom shaders, non-standard materials) instead of shipping a broken file.
-- [ ] **Shareable link under our domain.** From a result, "Share" mints a UUID and a public URL:
-      `https://frame-forge.view-source.com/share/${uuid}`.
-  - [ ] Persist the result artifact keyed by `uuid` — store the exported **GLB** (the portable form) rather than re-running the pipeline.
-  - [ ] `app/share/[uuid]/page.tsx` loads that artifact and renders it in the studio scene.
-  - [ ] Decide access model (public link vs. org-only) and whether links expire.
+  - [x] "Download GLB" (single binary file) and "Download glTF" (JSON + assets) buttons.
+        (`src/lib/export/gltf.ts`, wired in `src/components/model-viewer.tsx`.)
+  - [x] Bake procedural / canvas-generated textures into the export so materials survive the round-trip.
+        (Verified: the gift box's canvas wrapping texture survives GLB → share → GLTFLoader reload.)
+  - [x] Flag anything that can't export cleanly (custom shaders, non-standard materials) instead of shipping a broken file.
+        (`checkExportable` surfaces a warning banner before download.)
+- [x] **Shareable link under our domain.** From a result, "Share" mints a UUID and a public URL.
+      (Currently `${origin}/share/${uuid}`; swap `origin` for `frame-forge.view-source.com` when deployed.)
+  - [x] Persist the result artifact keyed by `uuid` — store the exported **GLB** (the portable form) rather than re-running the pipeline.
+        (`src/lib/shares/store.ts`; the client exports the GLB and POSTs it to `/api/share`.)
+  - [x] `app/share/[uuid]/page.tsx` loads that artifact and renders it in the studio scene (via `GLTFLoader`, source-independent).
+  - [ ] Decide access model (public link vs. org-only) and whether links expire. (Currently public-by-link; deferred to Phase 3 auth.)
 
 ---
 
@@ -37,6 +41,32 @@ Beyond the reconstruction pipeline itself, the product must ship these:
       `src/components/studio-scene.tsx` — no model picker, no imported meshes, no CSS modules.
 - [x] Landing page (`src/app/page.tsx`) stating the Image → Mesh goal, scene as backdrop.
 - [x] Verified: `pnpm build` + `pnpm check` clean, renders in browser with no console errors.
+
+### Product shell + Core features (this session)
+
+The full designer-facing vertical slice, built around a **stubbed worker seam** so it runs
+and is verifiable today. The real Agent-SDK + headless-render worker (Phase 0/1) drops into
+`src/lib/worker/run-job.ts` without touching anything above it.
+
+- [x] **Upload UI** — `src/app/studio/page.tsx` + `src/components/upload-form.tsx`
+      (drag/drop image + optional notes; the fixed prompt is applied server-side in `src/lib/prompt.ts`).
+- [x] **Job model + filesystem store + API** — `src/lib/jobs/*`, `src/app/api/jobs/*`.
+      Each job gets an isolated workspace at `data/jobs/<id>/`.
+- [x] **Background worker (STUB)** — `src/lib/worker/run-job.ts` simulates the 5–8-pass review
+      loop (rising fidelity, first-class `stylized-only` / `needs-more-views` outcomes) and emits
+      a procedural model key. Runs async; the page polls. **Not** the real agent yet.
+- [x] **Progress streaming** — `src/components/job-monitor.tsx` polls and shows pass N/total,
+      per-pass fidelity, and a live review timeline ("submit & come back" UX).
+- [x] **Result viewer** — reuses the studio scene (`studio-scene.tsx` now takes a subject slot);
+      procedural factories in `src/lib/models/*` stand in for the skill's `createObjectModel.ts`.
+- [x] **GLB / glTF export** + **Share link** + `/share/[uuid]` (see Core features above).
+- [x] Verified end-to-end: `next build` + `biome check` clean; upload → 7-pass run → 3D result
+      → Share → public GLB reload all exercised in-browser.
+- [ ] Support a few concurrent jobs (small worker pool) — real worker concern, deferred.
+
+> Note: lucide-react v1.26 in this repo has a malformed directive order (`"use strict"` before
+> `"use client"`) that crashes RSC. Icons for server components are routed through the
+> `src/components/icons.tsx` client boundary; `ui/button.tsx` gained `"use client"` for the same reason.
 
 ---
 

@@ -1,4 +1,7 @@
+import Link from "next/link";
+import { ArrowRight } from "@/components/icons";
 import StudioScene from "@/components/studio-scene";
+import { Button } from "@/components/ui/button";
 
 // Layered gradient backdrop (ported from the reference scene, expressed inline
 // instead of a CSS module).
@@ -63,6 +66,17 @@ export default function Home() {
 					no model files.
 				</p>
 
+				<div className="pointer-events-auto mt-8 flex items-center gap-3">
+					<Button asChild size="lg">
+						<Link href="/studio">
+							Start a reconstruction
+							<ArrowRight />
+						</Link>
+					</Button>
+					<Button asChild size="lg" variant="ghost">
+						<Link href="/jobs">View jobs</Link>
+					</Button>
+				</div>
 			</header>
 		</section>
 	);

@@ -7,7 +7,7 @@ import {
 	OrbitControls,
 } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 // --- Default scene settings (ported from the 3d-scene-demo reference) --------
@@ -110,11 +110,11 @@ function StudioLighting() {
 	);
 }
 
-function SceneControls({ reducedMotion }: { reducedMotion: boolean }) {
+function SceneControls({ autoRotate }: { autoRotate: boolean }) {
 	return (
 		<OrbitControls
 			makeDefault
-			autoRotate={!reducedMotion}
+			autoRotate={autoRotate}
 			autoRotateSpeed={CONTROLS.autoRotateSpeed}
 			dampingFactor={CONTROLS.dampingFactor}
 			enableDamping
@@ -156,7 +156,17 @@ function PlaceholderMesh({ reducedMotion }: { reducedMotion: boolean }) {
 	);
 }
 
-export default function StudioScene() {
+// The studio scene furniture (lighting, environment, shadows, controls) is
+// shared. By default it shows a neutral placeholder mesh as a backdrop; pass a
+// `subject` (any R3F content) to render a real model in the same staged scene —
+// this is how the result viewer and the share page reuse the exact lighting.
+export default function StudioScene({
+	subject,
+	autoRotate = true,
+}: {
+	subject?: ReactNode;
+	autoRotate?: boolean;
+}) {
 	const reducedMotion = useReducedMotion();
 
 	return (
@@ -185,7 +195,7 @@ export default function StudioScene() {
 			<StudioLighting />
 
 			<Suspense fallback={null}>
-				<PlaceholderMesh reducedMotion={reducedMotion} />
+				{subject ?? <PlaceholderMesh reducedMotion={reducedMotion} />}
 			</Suspense>
 
 			{/* Render once: a soft presence shadow, not a hard physical floor. */}
@@ -200,7 +210,7 @@ export default function StudioScene() {
 				scale={6}
 			/>
 
-			<SceneControls reducedMotion={reducedMotion} />
+			<SceneControls autoRotate={autoRotate && !reducedMotion} />
 		</Canvas>
 	);
 }
