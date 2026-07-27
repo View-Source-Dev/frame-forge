@@ -5,6 +5,7 @@
 
 import type * as THREE from "three";
 import { createDeskLamp } from "./desk-lamp";
+import { createFieldCamera } from "./field-camera";
 import { createGiftBox } from "./gift-box";
 
 interface ModelEntry {
@@ -13,6 +14,7 @@ interface ModelEntry {
 }
 
 const REGISTRY: Record<string, ModelEntry> = {
+	"field-camera": { label: "Field camera", build: createFieldCamera },
 	"gift-box": { label: "Gift box", build: createGiftBox },
 	"desk-lamp": { label: "Desk lamp", build: createDeskLamp },
 };

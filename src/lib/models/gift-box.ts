@@ -56,6 +56,7 @@ function ribbonMaterial(): THREE.Material {
 		clearcoat: 0.6,
 		clearcoatRoughness: 0.3,
 		sheen: 0.4,
+		side: THREE.DoubleSide,
 	});
 }
 
@@ -70,6 +71,7 @@ export function createGiftBox(): THREE.Group {
 		metalness: 0.0,
 		clearcoat: 0.25,
 		clearcoatRoughness: 0.5,
+		side: THREE.DoubleSide,
 	});
 
 	// Box body.
@@ -78,6 +80,12 @@ export function createGiftBox(): THREE.Group {
 		paperMaterial,
 	);
 	body.name = "body";
+	body.userData.part = {
+		id: "body",
+		name: "Wrapped carton",
+		specs: ["Rigid paperboard", "Procedural print", "Matte clearcoat"],
+		explode: [0, -0.42, 0],
+	};
 	body.castShadow = true;
 	body.receiveShadow = true;
 	group.add(body);
@@ -88,6 +96,12 @@ export function createGiftBox(): THREE.Group {
 		paperMaterial.clone(),
 	);
 	lid.name = "lid";
+	lid.userData.part = {
+		id: "lid",
+		name: "Lift-off lid",
+		specs: ["Oversized cap", "Pattern-matched wrap", "Friction fit"],
+		explode: [0, 0.56, 0],
+	};
 	lid.position.y = 0.63;
 	lid.castShadow = true;
 	lid.receiveShadow = true;
@@ -100,6 +114,12 @@ export function createGiftBox(): THREE.Group {
 		strapMat,
 	);
 	strapX.name = "ribbon-x";
+	strapX.userData.part = {
+		id: "ribbon-x",
+		name: "Cross ribbon",
+		specs: ["Satin weave", "Metallic fibre", "Continuous wrap"],
+		explode: [0.46, 0.08, 0],
+	};
 	strapX.position.y = 0.05;
 	strapX.castShadow = true;
 	group.add(strapX);
@@ -109,6 +129,12 @@ export function createGiftBox(): THREE.Group {
 		strapMat,
 	);
 	strapZ.name = "ribbon-z";
+	strapZ.userData.part = {
+		id: "ribbon-z",
+		name: "Longitudinal ribbon",
+		specs: ["Satin weave", "Metallic fibre", "Continuous wrap"],
+		explode: [0, 0.08, 0.46],
+	};
 	strapZ.position.y = 0.05;
 	strapZ.castShadow = true;
 	group.add(strapZ);
@@ -116,6 +142,12 @@ export function createGiftBox(): THREE.Group {
 	// Bow: two loops + a center knot, parented so the whole bow can be posed.
 	const bow = new THREE.Group();
 	bow.name = "bow";
+	bow.userData.part = {
+		id: "bow",
+		name: "Sculpted bow",
+		specs: ["Two formed loops", "Soft centre knot", "Removable mount"],
+		explode: [0, 0.62, 0.14],
+	};
 	bow.position.y = 0.82;
 
 	const loopGeo = new THREE.TorusGeometry(0.24, 0.075, 16, 40);

@@ -9,8 +9,8 @@
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { DATA_ROOT, writeJsonAtomic } from "@/lib/storage";
 
-const DATA_ROOT = path.join(process.cwd(), "data");
 const SHARES_DIR = path.join(DATA_ROOT, "shares");
 
 const shareDir = (uuid: string) => path.join(SHARES_DIR, uuid);
@@ -41,7 +41,7 @@ export async function createShare(input: {
 	};
 	await fs.mkdir(shareDir(uuid), { recursive: true });
 	await fs.writeFile(modelFile(uuid), input.glb);
-	await fs.writeFile(metaFile(uuid), JSON.stringify(meta, null, 2));
+	await writeJsonAtomic(metaFile(uuid), meta);
 	return meta;
 }
 

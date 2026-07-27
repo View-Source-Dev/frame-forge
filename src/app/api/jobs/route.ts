@@ -1,5 +1,9 @@
 import { createJob, listJobs } from "@/lib/jobs/store";
 import { DEFAULT_RECONSTRUCTION_PROMPT } from "@/lib/prompt";
+import {
+	isWorkerHeartbeatFresh,
+	readWorkerHeartbeat,
+} from "@/lib/worker/health";
 import { startJob } from "@/lib/worker/run-job";
 
 export const runtime = "nodejs";
@@ -13,6 +17,21 @@ const TOTAL_PASSES = 7;
 // and kick off the worker. Returns immediately; the job runs in the background
 // and the client polls GET /api/jobs/[id].
 export async function POST(request: Request): Promise<Response> {
+	const stubMode = process.env.FORGE_USE_STUB === "1";
+	if (
+		!stubMode &&
+		process.env.FORGE_REQUIRE_WORKER === "1" &&
+		!isWorkerHeartbeatFresh(await readWorkerHeartbeat())
+	) {
+		return Response.json(
+			{
+				error:
+					"The reconstruction worker is not ready. Please retry in a moment.",
+			},
+			{ status: 503 },
+		);
+	}
+
 	const form = await request.formData();
 	const image = form.get("image");
 	const submittedPrompt = (form.get("prompt") ?? "").toString().trim();
@@ -49,7 +68,7 @@ export async function POST(request: Request): Promise<Response> {
 	// Real jobs are picked up by the standalone worker (worker/worker.mjs), which
 	// polls for `queued` jobs. Set FORGE_USE_STUB=1 to instead run the in-process
 	// simulated worker (demo without an API key / without the worker running).
-	if (process.env.FORGE_USE_STUB === "1") startJob(job.id);
+	if (stubMode) startJob(job.id);
 	return Response.json(job, { status: 201 });
 }
 

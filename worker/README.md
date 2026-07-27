@@ -29,6 +29,21 @@ npm start                # poll loop (processes jobs as they arrive)
 node worker.mjs --once   # drain the current queue, then exit
 ```
 
+## Production
+
+The repository root includes a two-service Docker deployment. The worker image
+contains the Agent SDK, Chromium, Python, and a pinned `img2threejs` revision;
+the web and worker containers share a durable job/artifact volume:
+
+```bash
+cp .env.production.example .env.production
+docker compose --env-file .env.production up -d --build
+```
+
+See [`../DEPLOYMENT.md`](../DEPLOYMENT.md) for health checks, reverse-proxy
+requirements, persistence, and scaling limits. The production upload API checks
+the worker heartbeat before accepting a job.
+
 Env knobs:
 - `WORKER_MODEL` — agent model, default `sonnet`. `haiku` is cheaper still (fine
   for simple objects, riskier on complex ones); `opus` is the most capable/costly.

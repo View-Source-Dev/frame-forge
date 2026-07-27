@@ -12,9 +12,9 @@
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { DATA_ROOT, writeJsonAtomic } from "@/lib/storage";
 import type { Job } from "./types";
 
-const DATA_ROOT = path.join(process.cwd(), "data");
 const JOBS_DIR = path.join(DATA_ROOT, "jobs");
 
 const jobDir = (id: string) => path.join(JOBS_DIR, id);
@@ -63,8 +63,7 @@ export async function readJob(id: string): Promise<Job | null> {
 
 export async function writeJob(job: Job): Promise<void> {
 	job.updatedAt = new Date().toISOString();
-	await fs.mkdir(jobDir(job.id), { recursive: true });
-	await fs.writeFile(jobFile(job.id), JSON.stringify(job, null, 2));
+	await writeJsonAtomic(jobFile(job.id), job);
 }
 
 // Read-modify-write helper so the worker never clobbers a concurrent status

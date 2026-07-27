@@ -1,5 +1,4 @@
 node_modules/
-package-lock.json
 .render-test-workspace/
 render-test.glb
 render-test-preview.png

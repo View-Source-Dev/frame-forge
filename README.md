@@ -1,5 +1,15 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Production deployment
+
+Frame Forge includes a containerized Next.js web service and a separate
+`@anthropic-ai/claude-agent-sdk` reconstruction worker. The worker runs
+`img2threejs` and headless Chromium on the deployment machine rather than in the
+user's browser or local computer.
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the Docker Compose setup, required
+environment variables, persistence, health checks, and scaling constraints.
+
 ## Getting Started
 
 First, run the development server:

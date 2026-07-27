@@ -22,8 +22,11 @@ import {
 	mkdirSync,
 	readdirSync,
 	readFileSync,
+	renameSync,
+	rmSync,
 	writeFileSync,
 } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -32,7 +35,11 @@ import { renderAndExport } from "./render-model.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, "..");
-const JOBS_DIR = path.join(ROOT, "data", "jobs");
+const DATA_ROOT = process.env.FORGE_DATA_DIR
+	? path.resolve(process.env.FORGE_DATA_DIR)
+	: path.join(ROOT, "data");
+const JOBS_DIR = path.join(DATA_ROOT, "jobs");
+const HEARTBEAT_FILE = path.join(DATA_ROOT, "worker-health.json");
 
 // Load worker configuration from ../.env.local. Explicit shell environment
 // variables win, which makes one-off model/budget overrides predictable.
@@ -60,6 +67,9 @@ const MAX_USD = Number(process.env.WORKER_MAX_USD ?? 2);
 // the judging turns to a stronger model.
 const MODEL = process.env.WORKER_MODEL ?? "sonnet";
 const ONCE = process.argv.includes("--once");
+const SKILL_ROOT =
+	process.env.IMG2THREEJS_SKILL_DIR ??
+	path.join(os.homedir(), ".claude", "skills", "img2threejs");
 
 if (!process.env.ANTHROPIC_API_KEY) {
 	console.error(
@@ -67,13 +77,33 @@ if (!process.env.ANTHROPIC_API_KEY) {
 	);
 	process.exit(2);
 }
+if (!existsSync(path.join(SKILL_ROOT, "SKILL.md"))) {
+	console.error(
+		`[worker] img2threejs skill not found at ${SKILL_ROOT}. Set IMG2THREEJS_SKILL_DIR or install the skill in the worker image.`,
+	);
+	process.exit(3);
+}
 
 // --- Minimal job store (matches the app's src/lib/jobs schema) ----------------
 const jobFile = (id) => path.join(JOBS_DIR, id, "job.json");
 const readJob = (id) => JSON.parse(readFileSync(jobFile(id), "utf8"));
+function writeFileAtomic(target, contents) {
+	mkdirSync(path.dirname(target), { recursive: true });
+	const temporary = path.join(
+		path.dirname(target),
+		`.${path.basename(target)}.${process.pid}.${Date.now()}.tmp`,
+	);
+	try {
+		writeFileSync(temporary, contents);
+		renameSync(temporary, target);
+	} catch (error) {
+		rmSync(temporary, { force: true });
+		throw error;
+	}
+}
 function writeJob(job) {
 	job.updatedAt = new Date().toISOString();
-	writeFileSync(jobFile(job.id), JSON.stringify(job, null, 2));
+	writeFileAtomic(jobFile(job.id), JSON.stringify(job, null, 2));
 }
 function listQueued() {
 	if (!existsSync(JOBS_DIR)) return [];
@@ -110,8 +140,33 @@ const STAGE_SUMMARY = {
 };
 const TOTAL_STAGES = STAGES.length + 1; // + render/export
 
+let workerState = "starting";
+let currentJobId = null;
+function writeHeartbeat() {
+	writeFileAtomic(
+		HEARTBEAT_FILE,
+		JSON.stringify(
+			{
+				pid: process.pid,
+				state: workerState,
+				currentJobId,
+				model: MODEL,
+				updatedAt: new Date().toISOString(),
+			},
+			null,
+			2,
+		),
+	);
+}
+function setWorkerState(state, jobId = null) {
+	workerState = state;
+	currentJobId = jobId;
+	writeHeartbeat();
+}
+
 async function processJob(job) {
 	console.log(`[worker] processing ${job.id}`);
+	setWorkerState("running", job.id);
 	job.status = "running";
 	job.totalPasses = TOTAL_STAGES;
 	job.passes = [];
@@ -120,6 +175,7 @@ async function processJob(job) {
 
 	// Workspace + reference image the agent can read.
 	const workspace = path.join(JOBS_DIR, job.id, "workspace");
+	rmSync(workspace, { recursive: true, force: true });
 	mkdirSync(path.join(workspace, "src"), { recursive: true });
 	const ext = extFor(job.image?.type ?? "image/png");
 	copyFileSync(
@@ -178,8 +234,8 @@ async function processJob(job) {
 	// Deterministic render + GLB export (no tokens).
 	addStage("render");
 	const { glb, preview } = await renderAndExport({ workspaceDir: workspace });
-	writeFileSync(path.join(JOBS_DIR, job.id, "model.glb"), glb);
-	writeFileSync(path.join(JOBS_DIR, job.id, "preview.png"), preview);
+	writeFileAtomic(path.join(JOBS_DIR, job.id, "model.glb"), glb);
+	writeFileAtomic(path.join(JOBS_DIR, job.id, "preview.png"), preview);
 
 	job.status = "succeeded";
 	job.result = {
@@ -207,15 +263,53 @@ async function tick() {
 				j.error = err instanceof Error ? err.message : String(err);
 				writeJob(j);
 			} catch {}
+		} finally {
+			setWorkerState("idle");
 		}
 	}
 }
 
+function recoverInterruptedJobs() {
+	if (process.env.WORKER_RECOVER_RUNNING === "0" || !existsSync(JOBS_DIR))
+		return;
+	for (const id of readdirSync(JOBS_DIR)) {
+		try {
+			const job = readJob(id);
+			if (job.status !== "running") continue;
+			job.status = "queued";
+			job.passes = [];
+			job.result = null;
+			job.error = null;
+			job.dispatchedPrompt = null;
+			writeJob(job);
+			console.log(`[worker] recovered interrupted job ${id}`);
+		} catch (error) {
+			console.error(
+				`[worker] could not recover ${id}:`,
+				error instanceof Error ? error.message : error,
+			);
+		}
+	}
+}
+
+mkdirSync(DATA_ROOT, { recursive: true });
+recoverInterruptedJobs();
+setWorkerState("idle");
+const heartbeatTimer = setInterval(writeHeartbeat, 10_000);
+heartbeatTimer.unref();
+for (const signal of ["SIGINT", "SIGTERM"]) {
+	process.once(signal, () => {
+		setWorkerState("stopping", currentJobId);
+		process.exit(0);
+	});
+}
+
 console.log(
-	`[worker] started · model ${MODEL} · budget $${MAX_USD}/job · jobs dir ${JOBS_DIR}${ONCE ? " · --once" : ""}`,
+	`[worker] started · model ${MODEL} · budget $${MAX_USD}/job · skill ${SKILL_ROOT} · jobs dir ${JOBS_DIR}${ONCE ? " · --once" : ""}`,
 );
 if (ONCE) {
 	await tick();
+	setWorkerState("stopping");
 	console.log("[worker] queue drained, exiting (--once).");
 } else {
 	// Simple poll loop.

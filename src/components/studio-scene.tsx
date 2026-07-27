@@ -4,7 +4,7 @@ import {
 	ContactShadows,
 	Environment,
 	Lightformer,
-	OrbitControls,
+	TrackballControls,
 } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { type ReactNode, Suspense, useEffect, useRef, useState } from "react";
@@ -16,16 +16,13 @@ const CAMERA = {
 	far: 40,
 	fov: 34,
 	near: 0.1,
-	position: [0, 0.5, 5.2] as const,
+	position: [3.15, 1.55, 4.8] as const,
 };
 
 const CONTROLS = {
-	autoRotateSpeed: 0.35,
 	dampingFactor: 0.06,
 	maxDistance: 8,
-	maxPolarAngle: Math.PI * 0.92,
 	minDistance: 3.5,
-	minPolarAngle: Math.PI * 0.12,
 	rotateSpeed: 0.55,
 	zoomSpeed: 0.65,
 };
@@ -47,11 +44,11 @@ function useReducedMotion() {
 function StudioLighting() {
 	return (
 		<>
-			<hemisphereLight color="#d8e4ff" groundColor="#08090c" intensity={0.42} />
+			<hemisphereLight color="#d8e4ff" groundColor="#08090c" intensity={0.52} />
 			<directionalLight
 				castShadow
 				color="#f1f5ff"
-				intensity={3.2}
+				intensity={3.5}
 				position={[4.5, 6.5, 5]}
 				shadow-bias={-0.0001}
 				shadow-camera-bottom={-3}
@@ -110,19 +107,14 @@ function StudioLighting() {
 	);
 }
 
-function SceneControls({ autoRotate }: { autoRotate: boolean }) {
+function SceneControls() {
 	return (
-		<OrbitControls
+		<TrackballControls
 			makeDefault
-			autoRotate={autoRotate}
-			autoRotateSpeed={CONTROLS.autoRotateSpeed}
-			dampingFactor={CONTROLS.dampingFactor}
-			enableDamping
-			enablePan={false}
+			dynamicDampingFactor={CONTROLS.dampingFactor}
 			maxDistance={CONTROLS.maxDistance}
-			maxPolarAngle={CONTROLS.maxPolarAngle}
 			minDistance={CONTROLS.minDistance}
-			minPolarAngle={CONTROLS.minPolarAngle}
+			noPan
 			rotateSpeed={CONTROLS.rotateSpeed}
 			target={[0, 0, 0]}
 			zoomSpeed={CONTROLS.zoomSpeed}
@@ -162,7 +154,6 @@ function PlaceholderMesh({ reducedMotion }: { reducedMotion: boolean }) {
 // this is how the result viewer and the share page reuse the exact lighting.
 export default function StudioScene({
 	subject,
-	autoRotate = true,
 }: {
 	subject?: ReactNode;
 	autoRotate?: boolean;
@@ -187,7 +178,7 @@ export default function StudioScene({
 			onCreated={({ gl }) => {
 				gl.shadowMap.type = THREE.PCFShadowMap;
 				gl.toneMapping = THREE.ACESFilmicToneMapping;
-				gl.toneMappingExposure = 1.05;
+				gl.toneMappingExposure = 1.12;
 			}}
 			shadows
 		>
@@ -210,7 +201,7 @@ export default function StudioScene({
 				scale={6}
 			/>
 
-			<SceneControls autoRotate={autoRotate && !reducedMotion} />
+			<SceneControls />
 		</Canvas>
 	);
 }
