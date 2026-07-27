@@ -27,11 +27,32 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { buildAgentPrompt } from "../shared/reconstruction-prompt.mjs";
 import { renderAndExport } from "./render-model.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, "..");
 const JOBS_DIR = path.join(ROOT, "data", "jobs");
+
+// Load worker configuration from ../.env.local. Explicit shell environment
+// variables win, which makes one-off model/budget overrides predictable.
+const ENV_LOCAL = path.join(ROOT, ".env.local");
+const WORKER_ENV_KEYS = new Set([
+	"ANTHROPIC_API_KEY",
+	"WORKER_MODEL",
+	"WORKER_MAX_USD",
+]);
+if (existsSync(ENV_LOCAL)) {
+	for (const line of readFileSync(ENV_LOCAL, "utf8").split("\n")) {
+		const match = line.match(
+			/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/,
+		);
+		if (!match || !WORKER_ENV_KEYS.has(match[1])) continue;
+		if (process.env[match[1]] !== undefined) continue;
+		process.env[match[1]] = match[2].replace(/^["']|["']$/g, "").trim();
+	}
+}
+
 const MAX_USD = Number(process.env.WORKER_MAX_USD ?? 2);
 // Cost lever: the MVP has no vision-review step, so every stage is mechanical
 // (run scripts, edit JSON, generate code) — a cheaper model handles it fine and
@@ -40,15 +61,6 @@ const MAX_USD = Number(process.env.WORKER_MAX_USD ?? 2);
 const MODEL = process.env.WORKER_MODEL ?? "sonnet";
 const ONCE = process.argv.includes("--once");
 
-// --- Load ANTHROPIC_API_KEY from ../.env.local (value never logged) ----------
-const ENV_LOCAL = path.join(ROOT, ".env.local");
-if (existsSync(ENV_LOCAL)) {
-	for (const line of readFileSync(ENV_LOCAL, "utf8").split("\n")) {
-		const m = line.match(/^\s*(?:export\s+)?ANTHROPIC_API_KEY\s*=\s*(.*)\s*$/);
-		if (m)
-			process.env.ANTHROPIC_API_KEY = m[1].replace(/^["']|["']$/g, "").trim();
-	}
-}
 if (!process.env.ANTHROPIC_API_KEY) {
 	console.error(
 		"[worker] ANTHROPIC_API_KEY not set (need ../.env.local). Exiting.",
@@ -75,34 +87,6 @@ function listQueued() {
 	return out.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-// Same fixed prompt the app records (src/lib/prompt.ts), inlined here.
-function buildPrompt(notes) {
-	const base = `Reconstruct the object visible in the attached reference image (./reference file
-in this working directory) as a procedural Three.js model using the img2threejs skill.
-
-Constraints for this run:
-- Intended use: real-time browser prop with interactive performance.
-- Stylization is allowed when a single image cannot reveal hidden geometry.
-- You do NOT have a browser/renderer here, so do NOT render, screenshot, or run
-  the visual review loop — rendering + GLB export happen separately.
-- Run the skill's intake + assessment + spec steps (its forge/*.py scripts), then
-  generate the factory to ./src/createObjectModel.ts. Stop once that file exists.
-
-Work efficiently to keep cost down (this dominates spend):
-- Rely on the skill's SKILL.md. Do NOT open the deep grimoire/*.md reference
-  docs unless a script error actually forces you to.
-- Read each file at most once; don't re-read what's already in context.
-- Produce the *minimum* spec that passes validation for the blockout pass — do
-  not over-fill later-pass detail.
-Known gate requirements (fill these in up front so validation passes first try):
-- Assessment/spec scores are integers 0–3.
-- Each detailInventory entry needs a valid \`kind\` and a \`mapsTo.ref\` pointing at
-  a real component or material id.
-- The generator gates per pass; for the blockout pass only satisfy pass-1 needs.`;
-	const n = (notes ?? "").trim();
-	return n ? `${base}\n\nDesigner notes: ${n}` : base;
-}
-
 const extFor = (mime) =>
 	mime === "image/jpeg" || mime === "image/jpg"
 		? "jpg"
@@ -121,7 +105,7 @@ const STAGE_SUMMARY = {
 	intake: "Validated the reference image as a 3D target.",
 	assessment: "Classified object + wrote the quality contract.",
 	spec: "Authored and validated the sculpt spec.",
-	generate: "Generated the procedural factory (blockout pass).",
+	generate: "Generated and refined the reference-specific procedural factory.",
 	render: "Rendered the model and exported the GLB artifact.",
 };
 const TOTAL_STAGES = STAGES.length + 1; // + render/export
@@ -131,7 +115,7 @@ async function processJob(job) {
 	job.status = "running";
 	job.totalPasses = TOTAL_STAGES;
 	job.passes = [];
-	job.dispatchedPrompt = buildPrompt(job.prompt);
+	job.dispatchedPrompt = buildAgentPrompt(job.prompt);
 	writeJob(job);
 
 	// Workspace + reference image the agent can read.
@@ -158,7 +142,7 @@ async function processJob(job) {
 
 	let costUsd = 0;
 	for await (const msg of query({
-		prompt: buildPrompt(job.prompt),
+		prompt: buildAgentPrompt(job.prompt),
 		options: {
 			cwd: workspace,
 			model: MODEL,

@@ -15,8 +15,8 @@ export default function StudioPage() {
 				</h1>
 				<p className="mt-2 text-sm leading-relaxed text-[#a9b0bd]">
 					Upload a product design. Frame Forge reconstructs it as a procedural
-					Three.js mesh over a multi-pass, vision-graded review loop — then
-					hands you a GLB you can drop into any engine.
+					Three.js mesh through a staged, skill-guided workflow — then hands you
+					a GLB you can drop into any engine.
 				</p>
 			</div>
 			<div className="max-w-2xl">

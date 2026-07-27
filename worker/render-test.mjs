@@ -15,18 +15,46 @@ copyFileSync(
 );
 
 const start = Date.now();
-const { glb, preview } = await renderAndExport({ workspaceDir: ws });
+const { glb, preview, materialAudit } = await renderAndExport({
+	workspaceDir: ws,
+});
 writeFileSync(path.join(HERE, "render-test.glb"), glb);
 writeFileSync(path.join(HERE, "render-test-preview.png"), preview);
+
+const jsonChunkLength = glb.readUInt32LE(12);
+const jsonChunkType = glb.readUInt32LE(16);
+if (jsonChunkType !== 0x4e4f534a) {
+	throw new Error("render-test GLB does not start with a JSON chunk");
+}
+const gltf = JSON.parse(
+	glb
+		.subarray(20, 20 + jsonChunkLength)
+		.toString("utf8")
+		.trim(),
+);
+const exportedMaterials = gltf.materials ?? [];
+const allDoubleSided =
+	exportedMaterials.length > 0 &&
+	exportedMaterials.every((material) => material.doubleSided === true);
+const passed =
+	glb.length > 1000 &&
+	preview.length > 1000 &&
+	materialAudit.total > 0 &&
+	allDoubleSided;
+
 console.log(
 	JSON.stringify(
 		{
 			glbBytes: glb.length,
 			previewBytes: preview.length,
+			materialAudit,
+			exportedMaterialCount: exportedMaterials.length,
+			allDoubleSided,
 			seconds: Math.round((Date.now() - start) / 1000),
-			verdict: glb.length > 1000 && preview.length > 1000 ? "PASS" : "FAIL",
+			verdict: passed ? "PASS" : "FAIL",
 		},
 		null,
 		2,
 	),
 );
+if (!passed) process.exitCode = 1;

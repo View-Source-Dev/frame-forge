@@ -46,10 +46,34 @@ function buildGroup(factory) {
   throw new Error("factory did not return an Object3D");
 }
 
+function enforceDoubleSidedMaterials(root) {
+  const seen = new Set();
+  let total = 0;
+  let corrected = 0;
+  root.traverse((object) => {
+    const materials = Array.isArray(object.material)
+      ? object.material
+      : object.material
+        ? [object.material]
+        : [];
+    for (const material of materials) {
+      if (!material || !material.isMaterial || seen.has(material)) continue;
+      seen.add(material);
+      total += 1;
+      if (material.side !== THREE.DoubleSide) corrected += 1;
+      material.side = THREE.DoubleSide;
+      material.needsUpdate = true;
+    }
+  });
+  if (total === 0) throw new Error("generated model contains no mesh materials");
+  return { total, corrected };
+}
+
 async function main() {
   const factory = pickFactory(MODEL);
   if (!factory) throw new Error("no factory export found in createObjectModel");
   const group = buildGroup(factory);
+  window.__materialAudit = enforceDoubleSidedMaterials(group);
 
   const scene = new THREE.Scene();
   scene.add(group);
@@ -137,11 +161,13 @@ export async function renderAndExport({ workspaceDir }) {
 
 		const pngUrl = await page.evaluate("window.__png");
 		const glbB64 = await page.evaluate("window.__glb");
+		const materialAudit = await page.evaluate("window.__materialAudit");
 		if (!glbB64) throw new Error("GLB export produced no data");
 
 		return {
 			glb: Buffer.from(glbB64, "base64"),
 			preview: Buffer.from(String(pngUrl).split(",")[1], "base64"),
+			materialAudit,
 		};
 	} finally {
 		await browser.close();

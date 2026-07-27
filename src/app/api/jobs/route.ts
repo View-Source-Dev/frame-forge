@@ -1,4 +1,5 @@
 import { createJob, listJobs } from "@/lib/jobs/store";
+import { DEFAULT_RECONSTRUCTION_PROMPT } from "@/lib/prompt";
 import { startJob } from "@/lib/worker/run-job";
 
 export const runtime = "nodejs";
@@ -14,7 +15,8 @@ const TOTAL_PASSES = 7;
 export async function POST(request: Request): Promise<Response> {
 	const form = await request.formData();
 	const image = form.get("image");
-	const prompt = (form.get("prompt") ?? "").toString();
+	const submittedPrompt = (form.get("prompt") ?? "").toString().trim();
+	const prompt = submittedPrompt || DEFAULT_RECONSTRUCTION_PROMPT;
 
 	if (!(image instanceof File)) {
 		return Response.json(

@@ -1,20 +1,13 @@
-// The fixed reconstruction prompt. Wiring this default in — so the designer
-// never touches the CLI or the prompt — is the entire point of the product.
-//
-// Designers can add optional free-text notes; those are appended, never a
-// replacement, so the guardrails (intended use, stylization policy) always hold.
+import {
+	buildAgentPrompt,
+	DEFAULT_RECONSTRUCTION_PROMPT,
+} from "../../shared/reconstruction-prompt.mjs";
 
-const TEMPLATE = `Reconstruct the object visible in the attached reference image as a
-procedural Three.js model using the img2threejs skill.
+export { DEFAULT_RECONSTRUCTION_PROMPT };
 
-- Intended use: real-time browser prop with interactive performance.
-- Stylization is allowed when a single image cannot reveal hidden geometry —
-  prefer a faithful, action-ready approximation over a fake-precise guess.
-- Follow the staged sculpting pipeline and the AI-vision review loop; a
-  quality-gated "stylized only" or "needs more views" is a valid outcome.`;
-
-export function buildPrompt(designerNotes: string): string {
-	const notes = designerNotes.trim();
-	if (!notes) return TEMPLATE;
-	return `${TEMPLATE}\n\nDesigner notes: ${notes}`;
+// The editable user request is followed by the worker-only execution contract.
+// Keeping both app and standalone worker on this shared builder prevents the
+// prompt shown in the UI from drifting away from what the agent receives.
+export function buildPrompt(userPrompt: string): string {
+	return buildAgentPrompt(userPrompt);
 }

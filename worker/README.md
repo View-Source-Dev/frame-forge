@@ -15,7 +15,10 @@ Next app. The app enqueues jobs (writes `data/jobs/<id>/job.json` with
 
 - Node 20+.
 - `../.env.local` with `ANTHROPIC_API_KEY=…`.
-- The `img2threejs` skill installed at `~/.claude/skills/img2threejs`.
+- The [`img2threejs`](https://github.com/hoainho/img2threejs) agent skill
+  installed at `~/.claude/skills/img2threejs`. The worker enables it explicitly
+  with `skills: ["img2threejs"]`; its `SKILL.md`, `forge/`, and `grimoire/`
+  directories are part of the runtime workflow, not optional documentation.
 - One-time: `npm install && npx playwright install chromium` (in this dir).
 
 ## Run
@@ -30,6 +33,16 @@ Env knobs:
 - `WORKER_MODEL` — agent model, default `sonnet`. `haiku` is cheaper still (fine
   for simple objects, riskier on complex ones); `opus` is the most capable/costly.
 - `WORKER_MAX_USD` — per-job budget cap, default `2`.
+
+For higher-fidelity output, use `WORKER_MODEL=sonnet` (or `opus`) and consider
+raising `WORKER_MAX_USD` to `4`. `haiku` is cost-oriented and is more likely to
+settle for coarse primitive geometry. Both values can be placed in
+`../.env.local`; explicit shell values override the file.
+
+The generation prompt requires `THREE.DoubleSide` on every mesh material. As a
+second guard, `render-model.mjs` traverses the generated model before preview and
+GLB export, forces every material instance to `THREE.DoubleSide`, and marks it
+for update. This also makes `GLTFExporter` emit `doubleSided: true`.
 
 ## Scope / cost (MVP)
 

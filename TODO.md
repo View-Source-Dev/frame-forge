@@ -2,7 +2,7 @@
 
 **Goal:** a website that lets our designers upload a product design (+ a few prompts)
 and get a 3D result back — by wiring a Claude agent to the `img2threejs` skill with
-default prompts, so the designer never touches the CLI or the prompt.
+an editable default prompt, so the designer never touches the CLI.
 
 **Key constraint to remember:** `img2threejs` is **not** a one-shot function. It's a
 long-running **agentic loop** that generates Three.js code, *renders it in a browser*,
@@ -49,7 +49,7 @@ and is verifiable today. The real Agent-SDK + headless-render worker (Phase 0/1)
 `src/lib/worker/run-job.ts` without touching anything above it.
 
 - [x] **Upload UI** — `src/app/studio/page.tsx` + `src/components/upload-form.tsx`
-      (drag/drop image + optional notes; the fixed prompt is applied server-side in `src/lib/prompt.ts`).
+      (drag/drop image + editable default reconstruction prompt).
 - [x] **Job model + filesystem store + API** — `src/lib/jobs/*`, `src/app/api/jobs/*`.
       Each job gets an isolated workspace at `data/jobs/<id>/`.
 - [x] **Background worker (STUB)** — `src/lib/worker/run-job.ts` simulates the 5–8-pass review
@@ -105,14 +105,15 @@ tokens are the dominant cost, not output). `WORKER_MAX_USD` caps per-job spend (
       *deterministically* renders + exports the GLB (`worker/render-model.mjs`). Closing the
       loop (feed screenshots back to the agent's vision for `refine-*` passes) is the next step —
       the render tool that would supply those screenshots already exists.
-- [x] Fixed prompt template (designers never see it) — `src/lib/prompt.ts`, re-inlined in the worker.
+- [x] Editable default prompt — shared by the UI, API, stub, and standalone worker through
+      `shared/reconstruction-prompt.mjs`; worker-only execution constraints are appended automatically.
 - [x] Run one job at a time; result artifacts land in `data/jobs/<id>/` (`workspace/` with
       `createObjectModel.ts` + spec/assessment, plus `model.glb` + `preview.png`).
 - [x] View the generated mesh: served at `/api/jobs/<id>/model`, rendered in the studio scene.
 
 ## Phase 2 — Usable internal tool
 
-- [ ] Upload UI: designer uploads a product image + optional prompt notes.
+- [x] Upload UI: designer uploads a product image and can edit or reset the default prompt.
 - [ ] Job queue + worker: upload → queued → worker runs the agent session → deliver artifact.
       (Synchronous "wait on the page" won't work — jobs are minutes long.)
 - [ ] Each job gets an isolated workspace (assessment.json, spec, generated code, sheets).
