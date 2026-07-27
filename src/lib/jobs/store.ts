@@ -20,6 +20,7 @@ const JOBS_DIR = path.join(DATA_ROOT, "jobs");
 const jobDir = (id: string) => path.join(JOBS_DIR, id);
 const jobFile = (id: string) => path.join(jobDir(id), "job.json");
 const imageFile = (id: string) => path.join(jobDir(id), "reference");
+const modelFile = (id: string) => path.join(jobDir(id), "model.glb");
 
 export async function createJob(input: {
 	prompt: string;
@@ -91,6 +92,16 @@ export async function listJobs(): Promise<Job[]> {
 	return jobs
 		.filter((j): j is Job => j !== null)
 		.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+// The rendered GLB artifact the worker produced for this job, if any.
+export async function readModel(id: string): Promise<Buffer | null> {
+	try {
+		return await fs.readFile(modelFile(id));
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+		throw err;
+	}
 }
 
 export async function readImage(

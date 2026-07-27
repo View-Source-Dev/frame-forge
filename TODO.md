@@ -2,7 +2,7 @@
 
 **Goal:** a website that lets our designers upload a product design (+ a few prompts)
 and get a 3D result back — by wiring a Claude agent to the `img2threejs` skill with
-default prompts, so the designer never touches the CLI or the prompt.
+an editable default prompt, so the designer never touches the CLI.
 
 **Key constraint to remember:** `img2threejs` is **not** a one-shot function. It's a
 long-running **agentic loop** that generates Three.js code, *renders it in a browser*,
@@ -49,7 +49,7 @@ and is verifiable today. The real Agent-SDK + headless-render worker (Phase 0/1)
 `src/lib/worker/run-job.ts` without touching anything above it.
 
 - [x] **Upload UI** — `src/app/studio/page.tsx` + `src/components/upload-form.tsx`
-      (drag/drop image + optional notes; the fixed prompt is applied server-side in `src/lib/prompt.ts`).
+      (drag/drop image + editable default reconstruction prompt).
 - [x] **Job model + filesystem store + API** — `src/lib/jobs/*`, `src/app/api/jobs/*`.
       Each job gets an isolated workspace at `data/jobs/<id>/`.
 - [x] **Background worker (STUB)** — `src/lib/worker/run-job.ts` simulates the 5–8-pass review
@@ -75,29 +75,45 @@ and is verifiable today. The real Agent-SDK + headless-render worker (Phase 0/1)
 Everything else is standard web work. These two are the whole ballgame — prove them
 in isolation before building any product around them.
 
-- [ ] **Spike A — headless WebGL rendering.** Get a reliable server-side screenshot of a
-      Three.js scene (headless Chromium via Playwright/Puppeteer, GPU or SwiftShader).
-      Success = a "hello triangle" PNG captured headless on our target infra. If this is
-      flaky, the whole review loop is flaky.
-- [ ] **Spike B — Agent SDK + skill end-to-end.** Run the Claude Agent SDK headless with
-      `img2threejs` installed, Bash enabled (to run `forge/*.py`), and a fixed prompt
-      template. Success = one full reconstruction completes and emits `createObjectModel.ts`.
-- [ ] Write up findings: does each spike work, how flaky, rough token cost per run.
+- [x] **Spike A — headless WebGL rendering.** ✅ PASS. `spikes/spike-a-render.mjs` captures a
+      hello-triangle PNG in headless Chromium via **SwiftShader/ANGLE (software, no GPU)** with
+      `--enable-unsafe-swiftshader`. Key gotcha: `page.screenshot()` does not composite the WebGL
+      canvas headless — capture the **canvas** (`toDataURL`/`readPixels`). Not flaky.
+- [x] **Spike B — Agent SDK + skill end-to-end.** ✅ PASS. `spikes/spike-b-agent.mjs` ran
+      `@anthropic-ai/claude-agent-sdk` headless with `img2threejs` + Bash; emitted a 548-line
+      `createObjectModel.ts` (+ assessment.json + spec). Auth via `ANTHROPIC_API_KEY`; skill via
+      `settingSources:["user"]` + `skills:["img2threejs"]`; `permissionMode:"bypassPermissions"`.
+      The skill's Python quality gates ran and the agent self-corrected against them.
+- [x] Write up findings: see `spikes/README.md`. **⚠️ Cost: ~$1.83 for a *simple* object WITHOUT
+      the render loop (39 turns, ~5.5 min). Real objects + 5–8 review cycles will exceed the $2/job
+      cap — revisit budget (raise cap, cheaper model for mechanical stages, prompt-cache skill docs).**
 
 ---
 
 ## Phase 1 — Proof of concept
 
-- [ ] Wire Spike A + Spike B together: agent session uses the headless renderer inside its
-      review loop (generate → render → screenshot → vision judge → repeat).
-- [ ] Fixed prompt template (designers never see it): "reconstruct the object in this image;
-      intended use = real-time browser prop; stylization allowed."
-- [ ] Run one job at a time, dump the result (`createObjectModel.ts` + comparison sheets) to a folder.
-- [ ] View the generated mesh locally by importing it into the existing `studio-scene`.
+Real pipeline shipped as a standalone process in `worker/` (see `worker/README.md`).
+Verified end-to-end: uploaded image → agent emits `createObjectModel.ts` → headless
+render → **GLB artifact** → viewer + share, all in-browser.
+
+Cost optimized from **$2.44 → $0.95** per simple object: switch the agent to Sonnet
+(`WORKER_MODEL`, default) + a lean prompt that skips the deep grimoire docs (input
+tokens are the dominant cost, not output). `WORKER_MAX_USD` caps per-job spend (default $2).
+
+- [~] Wire Spike A + Spike B together. **MVP done WITHOUT the agent-driven review loop**
+      (the token sink): the agent produces the factory one-shot, then the worker
+      *deterministically* renders + exports the GLB (`worker/render-model.mjs`). Closing the
+      loop (feed screenshots back to the agent's vision for `refine-*` passes) is the next step —
+      the render tool that would supply those screenshots already exists.
+- [x] Editable default prompt — shared by the UI, API, stub, and standalone worker through
+      `shared/reconstruction-prompt.mjs`; worker-only execution constraints are appended automatically.
+- [x] Run one job at a time; result artifacts land in `data/jobs/<id>/` (`workspace/` with
+      `createObjectModel.ts` + spec/assessment, plus `model.glb` + `preview.png`).
+- [x] View the generated mesh: served at `/api/jobs/<id>/model`, rendered in the studio scene.
 
 ## Phase 2 — Usable internal tool
 
-- [ ] Upload UI: designer uploads a product image + optional prompt notes.
+- [x] Upload UI: designer uploads a product image and can edit or reset the default prompt.
 - [ ] Job queue + worker: upload → queued → worker runs the agent session → deliver artifact.
       (Synchronous "wait on the page" won't work — jobs are minutes long.)
 - [ ] Each job gets an isolated workspace (assessment.json, spec, generated code, sheets).
@@ -134,6 +150,9 @@ in isolation before building any product around them.
 
 ## Toolchain follow-ups
 
-- [ ] Pin `packageManager` in `package.json` to end the pnpm-version ambiguity
-      (installs currently need **Node 22 + pnpm 10**; Homebrew's default pnpm 11 errors on Node 20).
+- [x] Pin `packageManager` in `package.json` to end the pnpm-version ambiguity. **Fixed:**
+      pinned `pnpm@10.34.5` (engines `node >=18.12`, so it runs on this repo's Node 20). The
+      failure was Homebrew's global **pnpm 11** (needs Node 22.13). Corepack now serves the
+      pinned version — **one-time per machine: `corepack enable pnpm`** — so `pnpm dev` works
+      on Node 20 without touching Node or Homebrew. Verified: `pnpm dev` boots Next 16 on :3000.
 - [ ] Decide whether to delete unused create-next-app assets in `public/` (next.svg, vercel.svg, etc.).

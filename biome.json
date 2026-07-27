@@ -7,7 +7,7 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!**/*.svg"]
+		"includes": ["**", "!**/*.svg", "!spikes/evidence"]
 	},
 	"formatter": {
 		"enabled": true,

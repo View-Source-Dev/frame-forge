@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import GlbResult from "@/components/glb-result";
 import {
 	OutcomeBadge,
 	outcomeDescription,
@@ -69,7 +70,9 @@ export default function JobMonitor({ initialJob }: { initialJob: Job }) {
 								? `${job.passes.length} passes`
 								: `pass ${job.passes.length} of ${job.totalPasses}`}
 						</span>
-						{latest && <span>fidelity {latest.fidelity.toFixed(2)}</span>}
+						{latest && latest.fidelity > 0 && (
+							<span>fidelity {latest.fidelity.toFixed(2)}</span>
+						)}
 					</div>
 					{/* Progress bar (scaleX, per motion guidance) */}
 					<div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
@@ -93,9 +96,11 @@ export default function JobMonitor({ initialJob }: { initialJob: Job }) {
 										<span className="font-medium capitalize text-[#cdd3de]">
 											{pass.layer}
 										</span>
-										<span className="font-mono text-[#858c98]">
-											{pass.fidelity.toFixed(2)}
-										</span>
+										{pass.fidelity > 0 && (
+											<span className="font-mono text-[#858c98]">
+												{pass.fidelity.toFixed(2)}
+											</span>
+										)}
 									</div>
 									<p className="mt-0.5 text-[#858c98]">{pass.summary}</p>
 								</div>
@@ -127,13 +132,22 @@ export default function JobMonitor({ initialJob }: { initialJob: Job }) {
 								{outcomeDescription(job.result.outcome)}
 							</p>
 						)}
-						<ModelViewer
-							jobId={job.id}
-							modelKey={job.result.modelKey}
-							filename={`frame-forge-${modelLabel(job.result.modelKey)
-								.toLowerCase()
-								.replace(/\s+/g, "-")}`}
-						/>
+						{job.result.glb ? (
+							<GlbResult jobId={job.id} />
+						) : job.result.modelKey ? (
+							<ModelViewer
+								jobId={job.id}
+								modelKey={job.result.modelKey}
+								filename={`frame-forge-${modelLabel(job.result.modelKey)
+									.toLowerCase()
+									.replace(/\s+/g, "-")}`}
+							/>
+						) : null}
+						{typeof job.result.costUsd === "number" && (
+							<p className="text-xs text-[#5b6270]">
+								Reconstruction cost ${job.result.costUsd.toFixed(2)}
+							</p>
+						)}
 					</>
 				) : job.status === "failed" ? (
 					<div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">

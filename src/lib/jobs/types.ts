@@ -32,11 +32,16 @@ export interface ReviewPass {
 }
 
 export interface JobResult {
-	// Key into the procedural model registry. Stands in for the skill's real
-	// output artifact (`createObjectModel.ts`) — see src/lib/models/registry.ts.
-	modelKey: string;
+	// Legacy stub path: a key into the procedural model registry. `null` for real
+	// worker jobs, which deliver a rendered GLB artifact instead.
+	modelKey: string | null;
+	// True when the worker rendered a GLB artifact to disk (data/jobs/<id>/model.glb),
+	// served at /api/jobs/<id>/model and loaded directly by the viewer.
+	glb: boolean;
 	outcome: JobOutcome;
 	finalFidelity: number;
+	// What the reconstruction actually cost (real worker only).
+	costUsd?: number;
 }
 
 export interface Job {
@@ -44,12 +49,10 @@ export interface Job {
 	createdAt: string; // ISO 8601
 	updatedAt: string; // ISO 8601
 	status: JobStatus;
-	// The designer's optional notes. NOT the fixed reconstruction prompt — that
-	// template lives server-side in src/lib/prompt.ts and designers never see it.
+	// The full user-editable reconstruction request shown in the upload form.
 	prompt: string;
 	image: { name: string; type: string } | null;
-	// The full prompt actually dispatched to the agent (fixed template + notes).
-	// An internal audit trail — not surfaced in the designer-facing UI.
+	// The full prompt dispatched to the agent (editable request + worker contract).
 	dispatchedPrompt: string | null;
 	totalPasses: number; // planned review-cycle count for this job
 	passes: ReviewPass[]; // grows as the loop runs; drives the progress UI

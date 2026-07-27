@@ -106,7 +106,12 @@ async function runJob(id: string): Promise<void> {
 
 		await updateJob(id, (j) => {
 			j.status = status;
-			j.result = { modelKey, outcome, finalFidelity: ceiling || finalFidelity };
+			j.result = {
+				modelKey,
+				glb: false,
+				outcome,
+				finalFidelity: ceiling || finalFidelity,
+			};
 		});
 	} catch (err) {
 		await updateJob(id, (j) => {

@@ -1,4 +1,4 @@
-import { readJob } from "@/lib/jobs/store";
+import { readJob, readModel } from "@/lib/jobs/store";
 import { modelLabel } from "@/lib/models/registry";
 import { createShare } from "@/lib/shares/store";
 
@@ -6,19 +6,17 @@ export const runtime = "nodejs";
 
 const MAX_GLB_BYTES = 50 * 1024 * 1024; // 50 MB
 
-// POST /api/share — mint a public share from a result. The client exports the
-// instantiated model to GLB and uploads it here; we persist that portable
-// binary keyed by a fresh UUID (never re-running the pipeline). Access model is
-// public-by-link for now; org-only / expiry is a Phase 3 follow-up.
+// POST /api/share — mint a public share from a result. We persist a portable GLB
+// keyed by a fresh UUID (never re-running the pipeline). The GLB comes either
+// from the client (procedural/stub jobs export it in-browser) or, for real
+// worker jobs, from the artifact already on disk. Access model is public-by-link
+// for now; org-only / expiry is a Phase 3 follow-up.
 export async function POST(request: Request): Promise<Response> {
 	const form = await request.formData();
 	const glb = form.get("glb");
 	const jobId = (form.get("jobId") ?? "").toString();
 
-	if (!(glb instanceof File)) {
-		return Response.json({ error: "A GLB file is required." }, { status: 400 });
-	}
-	if (glb.size > MAX_GLB_BYTES) {
+	if (glb instanceof File && glb.size > MAX_GLB_BYTES) {
 		return Response.json(
 			{ error: "GLB exceeds the size limit." },
 			{ status: 413 },
@@ -33,10 +31,23 @@ export async function POST(request: Request): Promise<Response> {
 		);
 	}
 
-	const bytes = Buffer.from(await glb.arrayBuffer());
+	// Prefer an uploaded GLB; otherwise use the worker's stored artifact.
+	const bytes =
+		glb instanceof File
+			? Buffer.from(await glb.arrayBuffer())
+			: await readModel(jobId);
+	if (!bytes) {
+		return Response.json(
+			{ error: "No GLB available to share for this job." },
+			{ status: 400 },
+		);
+	}
+
 	const meta = await createShare({
 		jobId,
-		title: modelLabel(job.result.modelKey),
+		title: job.result.modelKey
+			? modelLabel(job.result.modelKey)
+			: "Reconstruction",
 		outcome: job.result.outcome,
 		glb: bytes,
 	});

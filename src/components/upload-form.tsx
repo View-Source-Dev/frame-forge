@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Job } from "@/lib/jobs/types";
+import { DEFAULT_RECONSTRUCTION_PROMPT } from "@/lib/prompt";
 
 export default function UploadForm() {
 	const router = useRouter();
 	const [file, setFile] = useState<File | null>(null);
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-	const [prompt, setPrompt] = useState("");
+	const [prompt, setPrompt] = useState(DEFAULT_RECONSTRUCTION_PROMPT);
 	const [dragging, setDragging] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -131,25 +132,37 @@ export default function UploadForm() {
 				</div>
 			)}
 
-			{/* Optional notes */}
+			{/* Editable agent prompt */}
 			<div className="flex flex-col gap-2">
-				<label
-					htmlFor="notes"
-					className="text-xs font-medium uppercase tracking-[0.14em] text-[#858c98]"
-				>
-					Notes <span className="normal-case tracking-normal">(optional)</span>
-				</label>
+				<div className="flex items-center justify-between gap-3">
+					<label
+						htmlFor="prompt"
+						className="text-xs font-medium uppercase tracking-[0.14em] text-[#858c98]"
+					>
+						Reconstruction prompt
+					</label>
+					<Button
+						type="button"
+						size="xs"
+						variant="ghost"
+						onClick={() => setPrompt(DEFAULT_RECONSTRUCTION_PROMPT)}
+						disabled={prompt === DEFAULT_RECONSTRUCTION_PROMPT}
+					>
+						Reset default
+					</Button>
+				</div>
 				<textarea
-					id="notes"
+					id="prompt"
 					value={prompt}
 					onChange={(e) => setPrompt(e.target.value)}
-					rows={3}
-					placeholder="Anything that helps — material, scale, which side is the front…"
-					className="w-full resize-y rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-sm text-[#f2f3f5] outline-none transition-colors duration-150 ease-[var(--ease-out)] placeholder:text-[#5b6270] focus:border-[#86a9e8]/60 focus:bg-white/[0.04]"
+					rows={12}
+					placeholder="Describe how the worker should reconstruct this image…"
+					className="w-full resize-y rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-xs leading-relaxed text-[#f2f3f5] outline-none transition-colors duration-150 ease-[var(--ease-out)] placeholder:text-[#5b6270] focus:border-[#86a9e8]/60 focus:bg-white/[0.04]"
 				/>
 				<p className="text-xs text-[#5b6270]">
-					A default reconstruction prompt is applied automatically — you never
-					touch the CLI or the prompt.
+					This request is sent to the worker. Edit it for material, scale,
+					orientation, or intended-use requirements; worker safety and output
+					instructions are added automatically.
 				</p>
 			</div>
 
